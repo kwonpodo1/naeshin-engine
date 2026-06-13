@@ -10,3 +10,7 @@ venv/
 # 작업 문서 (엔진 패키지와 무관 · 로컬 전용 · 저장소에 올리지 않음)
 *.html
 docs/
+
+# 골든 테스트 샘플 PDF (저작권·용량 — 로컬 전용)
+tests/samples/
+tests/_port_check.py
