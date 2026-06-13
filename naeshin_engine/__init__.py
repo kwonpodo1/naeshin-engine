@@ -11,4 +11,4 @@ studio wrapper 는 `from naeshin_engine import extract_ebs as _ebs_old` 형태�
 from naeshin_engine import extract_ebs, extract_mock_exam, extract_passages
 
 __all__ = ["extract_ebs", "extract_mock_exam", "extract_passages"]
-__version__ = "0.0.0"  # 릴리스 시 git 태그와 함께 수동 bump
+__version__ = "1.0.0"  # 릴리스 시 git 태그와 함께 수동 bump
