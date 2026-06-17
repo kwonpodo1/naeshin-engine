@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "naeshin-engine"
-version = "1.1.0"            # git 태그로 관리 (릴리스 시 수동 bump) · 1.1.0: exam 출제 규칙 공유 추가
+version = "1.2.0"            # git 태그로 관리 (릴리스 시 수동 bump) · 1.1.0: exam 규칙 공유 · 1.2.0: 분석·단어 규칙 공유 추가
 description = "naeshin 내신자료 추출 엔진 — auto/studio 공유 단일 원본"
 requires-python = ">=3.10"
 license = { text = "AGPL-3.0-or-later" }
