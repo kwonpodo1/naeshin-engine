@@ -3,7 +3,7 @@
 naeshin **auto**(실험실)와 **studio**(SaaS)가 함께 쓰는 **공유 엔진 패키지**. 한 곳에서 관리하고 양쪽이 가져다 쓴다.
 
 - GitHub: `kwonpodo1/naeshin-engine` (public, AGPL-3.0)
-- 현재 버전: `v1.2.0`
+- 현재 버전: `v1.3.0`
 
 ## 무엇이 들어 있나 (단일 소스)
 
@@ -13,8 +13,10 @@ naeshin **auto**(실험실)와 **studio**(SaaS)가 함께 쓰는 **공유 엔진
 | 자료생성 규칙 | `naeshin_engine/rules/analysis_rules.md` | 내용분석 (색·라벨·노트·서술형 선정) |
 | | `naeshin_engine/rules/exam_rules.md` | 실전·변형문제 (유형·가공·오답·해설·서술형) |
 | | `naeshin_engine/rules/vocab_rules.md` | 단어시험지 (포함/제외·품질·뜻 표기) |
+| 한국어 공백 정리 | `naeshin_engine/ko_spacing.py` · `ko_spacing_core.py` | 조사·어절중간 띄어쓰기 오타 수정 (`apply_safe`) — studio 생성 한국어에도 적용 |
+| PDF 빌더 | `naeshin_engine/make_pdf.py` · `make_exam_pdf.py` · `make_vocab_pdf.py` · `font_setup.py` | 분석·실전·단어 PDF 레이아웃 (폰트 윈도우/리눅스 분기 · 분석 로고박스는 `show_logo_box` 파라미터) |
 
-이 파일들이 **유일한 원본**이다. auto·studio 어디에도 사본을 두지 않는다.
+이 파일들이 **유일한 원본**이다. auto·studio 어디에도 사본을 두지 않는다 (auto `scripts/`·studio `_engine/`의 같은 이름 파일은 재수출 shim).
 
 ## 누가 어떻게 쓰나
 
