@@ -456,12 +456,19 @@ def build_exam_pdf(exam_info, sections, output_path, mode='teacher'):
         )
         # 지칭 문제(발문에 '밑줄 친 "X"')의 대상 표현을 지문에서 자동 밑줄 처리.
         # 따옴표가 없는 어법/어휘 밑줄(①~⑤ 마커)·기타 유형에는 매칭되지 않아 영향 없음.
-        _QUOTES = '"\'“”‘’'
-        _ul_pat = re.compile(r'밑줄\s*친\s*[' + _QUOTES + r']([^' + _QUOTES + r']+)[' + _QUOTES + r']')
+        # 여는/닫는 따옴표를 종류별 쌍으로 매칭한다 → 대상 표현 내부의 소유격 아포스트로피(’)가
+        # 닫는 따옴표로 오인돼 캡처가 끊기던 문제 방지(예: "...genes’ part" 전체 캡처).
+        _ul_pat = re.compile(
+            r'밑줄\s*친\s*'
+            r'(?:"([^"]+)"'        # 직선 큰따옴표
+            r'|“([^”]+)”'          # 곡선 큰따옴표
+            r"|'([^']+)'"          # 직선 작은따옴표
+            r'|‘([^’]+)’)'         # 곡선 작은따옴표
+        )
         underline_targets = []
         for _q in qs:
             for _m in _ul_pat.finditer(_q.get('question', '')):
-                _t = _m.group(1).strip()
+                _t = (_m.group(1) or _m.group(2) or _m.group(3) or _m.group(4) or '').strip()
                 if _t:
                     underline_targets.append(_t)
         _underlined = set()

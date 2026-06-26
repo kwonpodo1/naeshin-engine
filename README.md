@@ -3,7 +3,7 @@
 naeshin **auto**(실험실)와 **studio**(SaaS)가 함께 쓰는 **공유 엔진 패키지**. 한 곳에서 관리하고 양쪽이 가져다 쓴다.
 
 - GitHub: `kwonpodo1/naeshin-engine` (public, AGPL-3.0)
-- 현재 버전: `v1.5.0`
+- 현재 버전: `v1.6.0`
 
 ## 무엇이 들어 있나 (단일 소스)
 
