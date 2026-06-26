@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "naeshin-engine"
-version = "1.4.0"            # git 태그로 관리 (릴리스 시 수동 bump) · 1.2.0 분석·단어 규칙 · 1.3.0 공백정리+PDF 빌더 · 1.3.1 단어 환각 방지 · 1.4.0 지칭문제 지문 자동 밑줄
+version = "1.5.0"            # git 태그로 관리 (릴리스 시 수동 bump) · 1.2.0 분석·단어 규칙 · 1.3.0 공백정리+PDF 빌더 · 1.3.1 단어 환각 방지 · 1.4.0 지칭문제 지문 자동 밑줄 · 1.5.0 변형문제 생성기·규칙 보강(정답표 서술형·영작 답란·전용 가공지문 렌더 + 검수 5규칙)
 description = "naeshin 내신자료 추출 엔진 — auto/studio 공유 단일 원본"
 requires-python = ">=3.10"
 license = { text = "AGPL-3.0-or-later" }

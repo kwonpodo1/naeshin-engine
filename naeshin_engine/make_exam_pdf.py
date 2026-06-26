@@ -260,8 +260,11 @@ def build_choices_block(q, styles):
             ('BOTTOMPADDING',(0,0), (-1,-1), 5),
         ]))
         items.append(cond_t)
-        items.append(Spacer(1, 1*mm))
-        items.append(Paragraph('_' * 60, styles['q_text']))
+        items.append(Spacer(1, 4*mm))   # 조건 박스와 답란 사이 여백
+        # 학생이 영작을 쓸 공간: 밑줄 3줄 + 줄 사이 넉넉한 여백
+        for _ in range(3):
+            items.append(Paragraph('_' * 58, styles['q_text']))
+            items.append(Spacer(1, 7*mm))
 
     elif q.get('choices'):
         for choice in q['choices']:
@@ -314,8 +317,9 @@ def validate_answers(sections):
 
 # ── 정답 일람표 ────────────────────────────────────────
 def build_answer_table(all_questions, styles):
+    # 객관식·서술형 모두 표시 (서술형은 답란에 '서술형' 표기 — 정답표에서 번호 누락 방지)
     obj_qs = [q for q in all_questions
-              if q.get('choices') is not None and q.get('answer_display') != '서술형']
+              if q.get('choices') is not None or q.get('answer_display') == '서술형']
 
     if not obj_qs:
         return [Spacer(1, 1*mm)]
@@ -328,7 +332,9 @@ def build_answer_table(all_questions, styles):
         group = obj_qs[start:start+chunk]
         header_row = [Paragraph(str(q['num']), styles['ans_table_head']) for q in group]
         answer_row = [Paragraph(
-            _answer_char(q), styles['ans_table_val']
+            '<font size="8">서술형</font>' if q.get('answer_display') == '서술형'
+            else _answer_char(q),
+            styles['ans_table_val']
         ) for q in group]
         col_w = tw / len(group)
         t = Table([header_row, answer_row], colWidths=[col_w]*len(group))
@@ -488,8 +494,16 @@ def build_exam_pdf(exam_info, sections, output_path, mode='teacher'):
                 section_items.append(ins_para)
                 section_items.append(Spacer(1, 3*mm))
 
-            # ── 3. 지문 (첫 문제에만 부착; 후속 문제는 같은 지문을 공유) ──
-            if idx == 0:
+            # ── 3. 지문 ──
+            # 문항 전용 가공 지문(어휘/어법 밑줄 = passage_underlined, 어법 ABC = passage_abc)이
+            # 있으면 그 문항에 부착하고, 없으면 섹션 공유 지문을 첫 문제에만 부착(후속 문제는 공유).
+            q_passage = q.get('passage_underlined') or q.get('passage_abc')
+            if q_passage:
+                for para_text in q_passage.split('\n'):
+                    if para_text.strip():
+                        section_items.append(Paragraph(para_text.strip(), passage_style))
+                section_items.append(Spacer(1, 4*mm))
+            elif idx == 0:
                 section_items.extend(passage_flowables)
 
             # ── 4. 선택지 및 조건 박스 ──
