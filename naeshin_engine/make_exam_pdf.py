@@ -22,6 +22,7 @@ exam_data 파일이 제공해야 할 것:
 import sys
 import os
 import argparse
+import re
 
 
 from reportlab.lib.pagesizes import A4
@@ -447,10 +448,26 @@ def build_exam_pdf(exam_info, sections, output_path, mode='teacher'):
             textColor=colors.black,
             firstLineIndent=12,
         )
+        # 지칭 문제(발문에 '밑줄 친 "X"')의 대상 표현을 지문에서 자동 밑줄 처리.
+        # 따옴표가 없는 어법/어휘 밑줄(①~⑤ 마커)·기타 유형에는 매칭되지 않아 영향 없음.
+        _QUOTES = '"\'“”‘’'
+        _ul_pat = re.compile(r'밑줄\s*친\s*[' + _QUOTES + r']([^' + _QUOTES + r']+)[' + _QUOTES + r']')
+        underline_targets = []
+        for _q in qs:
+            for _m in _ul_pat.finditer(_q.get('question', '')):
+                _t = _m.group(1).strip()
+                if _t:
+                    underline_targets.append(_t)
+        _underlined = set()
         passage_flowables = []
         for para_text in passage.split('\n'):
             if para_text.strip():
-                passage_flowables.append(Paragraph(para_text.strip(), passage_style))
+                _rendered = para_text.strip()
+                for _t in underline_targets:
+                    if _t not in _underlined and _t in _rendered:
+                        _rendered = _rendered.replace(_t, '<u>' + _t + '</u>', 1)
+                        _underlined.add(_t)
+                passage_flowables.append(Paragraph(_rendered, passage_style))
         passage_flowables.append(Spacer(1, 4*mm))
 
         for idx, q in enumerate(qs):
