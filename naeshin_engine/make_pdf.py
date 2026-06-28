@@ -138,29 +138,92 @@ def _xml_escape(text):
                 .replace('>', '&gt;'))
 
 
-def build_en_paragraph(sentence, styles):
-    """highlights 구절을 색상+볼드로 표시. 라벨은 build_label_row()에서 별도 처리.
+# 닫는 인용부호 — near-miss(따옴표 안에 문장부호) relaxed 매치용.
+_CLOSE_QUOTES = '"\'’”'
 
-    가드(#4): ① en 전체를 먼저 이스케이프(본문 내 <, >, & 가 마크업을 깨는 크래시 방지)
-    ② 치환은 placeholder 로 — 이미 삽입된 태그 내부 재치환 오염 방지
-    ③ 영단어 경계 존중 — 구절이 단어 내부(or→world)에 걸리지 않게
-    ④ 구절이 en 에 없으면 조용히 색만 빠지는 대신 stderr 경고."""
-    en_text    = sentence['en']
-    highlights = sentence.get('highlights', [])
-    result     = _xml_escape(en_text)
 
+def _span_candidates(esc_en, esc_phrase):
+    """esc_phrase 의 (start,end) 후보 + relaxed 여부.
+    word-boundary → plain → relaxed-quote(닫는따옴표 앞 문장부호 optional) 순."""
+    pat = re.escape(esc_phrase)
+    if esc_phrase[:1].isalnum():
+        pat = r'(?<![A-Za-z0-9])' + pat
+    if esc_phrase[-1:].isalnum():
+        pat = pat + r'(?![A-Za-z0-9])'
+    ms = [(m.start(), m.end()) for m in re.finditer(pat, esc_en)]
+    if ms:
+        return ms, False
+    i = esc_en.find(esc_phrase)
+    if i >= 0:
+        return [(i, i + len(esc_phrase))], False
+    if esc_phrase and esc_phrase[-1] in _CLOSE_QUOTES:
+        rpat = re.escape(esc_phrase[:-1]) + r'[.,;:!?]?' + re.escape(esc_phrase[-1])
+        rms = [(m.start(), m.end()) for m in re.finditer(rpat, esc_en)]
+        if rms:
+            return rms, True
+    return [], False
+
+
+def _locate_spans(esc_en, highlights):
+    """각 하이라이트 구절의 위치를 비소비로 탐색.
+    반환: spans[(s,e,hex,idx)], needs_interval(겹침 or relaxed), missed[(idx,phrase)]."""
+    spans, claimed, missed = [], [], []
+    occupied = [False] * len(esc_en)
+    needs = False
+    for idx, hl in enumerate(highlights):
+        phrase, color_key = hl[0], hl[1]
+        esc_phrase = _xml_escape(str(phrase))
+        cands, relaxed = _span_candidates(esc_en, esc_phrase)
+        pick = next(((s, e) for (s, e) in cands if (s, e) not in claimed), None)
+        if pick is None:
+            missed.append((idx, phrase))
+            continue
+        s, e = pick
+        claimed.append((s, e))
+        if relaxed or any(occupied[s:e]):
+            needs = True
+        for k in range(s, e):
+            occupied[k] = True
+        spans.append((s, e, c2h(COLOR_MAP.get(color_key, colors.black)), idx))
+    return spans, needs, missed
+
+
+def _render_intervals(esc_en, spans):
+    """문자별 '가장 짧은(=안쪽) span 색 우선'(동률 시 뒤 idx)으로 nested 색칠."""
+    n = len(esc_en)
+    win_len = [None] * n
+    win_hex = [None] * n
+    win_idx = [-1] * n
+    for (s, e, hex_c, idx) in spans:
+        L = e - s
+        for k in range(s, e):
+            if win_len[k] is None or L < win_len[k] or (L == win_len[k] and idx > win_idx[k]):
+                win_len[k], win_hex[k], win_idx[k] = L, hex_c, idx
+    out, i = [], 0
+    while i < n:
+        h = win_hex[i]
+        j = i
+        while j < n and win_hex[j] == h:
+            j += 1
+        seg = esc_en[i:j]
+        out.append(f'<font color="{h}"><b>{seg}</b></font>' if h else seg)
+        i = j
+    return ''.join(out)
+
+
+def _render_flat(sentence, esc_en, highlights):
+    """기존 placeholder 기반 평면 색칠 — 겹침/near-miss 없는 문장 전용(출력 불변)."""
+    result = esc_en
     pending = []  # (placeholder, 최종 마크업)
-    for idx, (phrase, color_key, label) in enumerate(highlights):
-        col   = COLOR_MAP.get(color_key, colors.black)
-        hex_c = c2h(col)
+    for idx, hl in enumerate(highlights):
+        phrase, color_key = hl[0], hl[1]
+        hex_c = c2h(COLOR_MAP.get(color_key, colors.black))
         esc_phrase = _xml_escape(phrase)
-
         pat = re.escape(esc_phrase)
         if esc_phrase[:1].isalnum():
             pat = r'(?<![A-Za-z0-9])' + pat
         if esc_phrase[-1:].isalnum():
             pat = pat + r'(?![A-Za-z0-9])'
-
         placeholder = f'\x00H{idx}\x00'
         result, n = re.subn(pat, placeholder, result, count=1)
         if n == 0 and esc_phrase in result:
@@ -173,14 +236,36 @@ def build_en_paragraph(sentence, styles):
                   file=sys.stderr)
             continue
         pending.append((placeholder, f'<font color="{hex_c}"><b>{esc_phrase}</b></font>'))
-
     for placeholder, markup in pending:
         result = result.replace(placeholder, markup, 1)
+    return result
 
+
+def _render_en_markup(sentence):
+    """en 색칠 마크업 문자열. 겹침/near-miss 있으면 구간 렌더, 아니면 평면(출력 불변)."""
+    highlights = sentence.get('highlights', [])
+    esc_en = _xml_escape(sentence['en'])
+    spans, needs_interval, missed = _locate_spans(esc_en, highlights)
+    if needs_interval:
+        result = _render_intervals(esc_en, spans)
+        for idx, phrase in missed:
+            num = sentence.get('num', '?')
+            print(f"[highlight-miss] 문장{num}: 구절 '{phrase}' 이(가) en에 없음 — 색 누락",
+                  file=sys.stderr)
+    else:
+        result = _render_flat(sentence, esc_en, highlights)
     if sentence.get('star', False):
         result = '<font color="#cc0000">★ </font>' + result
+    return result
 
-    return Paragraph(result, styles['en'])
+
+def build_en_paragraph(sentence, styles):
+    """highlights 구절을 색상+볼드로 표시. 라벨은 build_label_row()에서 별도 처리.
+
+    가드(#4): ① en 전체 이스케이프 ② 영단어 경계 존중 ③ 구절이 en 에 없으면 stderr 경고.
+    겹쳐 칠한 하이라이트(단어/구/절 레이어)는 구간 렌더러로 안쪽색 우선 nested 색칠하고,
+    겹침이 없는 문장은 기존 평면 경로를 그대로 타 출력이 불변이다."""
+    return Paragraph(_render_en_markup(sentence), styles['en'])
 
 
 # ── 문장 블록 ─────────────────────────────────────────────
