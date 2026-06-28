@@ -97,6 +97,38 @@ class ExamDocTemplate(BaseDocTemplate):
 
 
 # ── 데이터 로드 ─────────────────────────────────────────
+def extract_circled_map(choices):
+    """어법/어휘 밑줄 문항의 보기(['① possess', '② from', ...])에서
+    마커별 밑줄 대상 표현을 추출한다 → {'①': 'possess', '②': 'from', ...}.
+    보기 표현이 여러 단어인 구('⑤ has been called')도 그대로 담는다."""
+    result = {}
+    for ch in choices or []:
+        m = re.match(r'\s*([①-⑩])\s*(.+)', str(ch))
+        if m:
+            result[m.group(1)] = m.group(2).strip()
+    return result
+
+
+def apply_circled_underlines(text, circled_map):
+    """지문 text에서 각 마커(①~⑩) 직후의 대상 표현을 <u>로 감싼다.
+    지문은 보통 '①possess'처럼 마커와 표현이 붙어 있고, 대상 표현은 보기에서 온다.
+    마커가 지문에 없거나 표현이 마커 직후와 일치하지 않으면 건드리지 않는다(오밑줄 방지)."""
+    for marker, expr in (circled_map or {}).items():
+        if not expr:
+            continue
+        idx = text.find(marker)
+        if idx < 0:
+            continue
+        after = text[idx + len(marker):]
+        stripped = after.lstrip()
+        lead = len(after) - len(stripped)
+        if stripped.startswith(expr):
+            head = text[:idx + len(marker)] + after[:lead]
+            tail = stripped[len(expr):]
+            text = head + '<u>' + expr + '</u>' + tail
+    return text
+
+
 def load_exam_data(data_file):
     import importlib.util
     spec = importlib.util.spec_from_file_location("exam_data", data_file)
@@ -471,6 +503,13 @@ def build_exam_pdf(exam_info, sections, output_path, mode='teacher'):
                 _t = (_m.group(1) or _m.group(2) or _m.group(3) or _m.group(4) or '').strip()
                 if _t:
                     underline_targets.append(_t)
+        # 어법/어휘 밑줄(밑줄 친 ①~⑤ / 밑줄 친 단어·부분) 문항의 보기에서 마커별 대상 표현을
+        # 모아 지문의 ①~⑤ 마커 직후 표현을 자동 <u> 처리한다(따옴표 인용이 아닌 번호 밑줄 유형).
+        circled_map = {}
+        for _q in qs:
+            _qt = _q.get('question', '')
+            if '①' in _qt or '밑줄 친 단어' in _qt or '밑줄 친 부분' in _qt:
+                circled_map.update(extract_circled_map(_q.get('choices', [])))
         _underlined = set()
         passage_flowables = []
         for para_text in passage.split('\n'):
@@ -480,6 +519,7 @@ def build_exam_pdf(exam_info, sections, output_path, mode='teacher'):
                     if _t not in _underlined and _t in _rendered:
                         _rendered = _rendered.replace(_t, '<u>' + _t + '</u>', 1)
                         _underlined.add(_t)
+                _rendered = apply_circled_underlines(_rendered, circled_map)
                 passage_flowables.append(Paragraph(_rendered, passage_style))
         passage_flowables.append(Spacer(1, 4*mm))
 
@@ -506,9 +546,13 @@ def build_exam_pdf(exam_info, sections, output_path, mode='teacher'):
             # 있으면 그 문항에 부착하고, 없으면 섹션 공유 지문을 첫 문제에만 부착(후속 문제는 공유).
             q_passage = q.get('passage_underlined') or q.get('passage_abc')
             if q_passage:
+                _q_circled = {}
+                if '①' in qtext or '밑줄 친 단어' in qtext or '밑줄 친 부분' in qtext:
+                    _q_circled = extract_circled_map(q.get('choices', []))
                 for para_text in q_passage.split('\n'):
                     if para_text.strip():
-                        section_items.append(Paragraph(para_text.strip(), passage_style))
+                        _r = apply_circled_underlines(para_text.strip(), _q_circled)
+                        section_items.append(Paragraph(_r, passage_style))
                 section_items.append(Spacer(1, 4*mm))
             elif idx == 0:
                 section_items.extend(passage_flowables)
